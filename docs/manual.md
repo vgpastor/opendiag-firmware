@@ -439,6 +439,7 @@ for the list of commands.
 | `mode` | Show the current mode, the default, and every available mode |
 | `mode <name>` | Switch mode, for example `mode slcan` |
 | `ctrl <command>` | Run a [control command](#control-commands) |
+| `canport obd` / `canport aux` | Choose where the next CAN open goes: the OBD socket (pins 6/14, default) or the AUX_CAN header J3 (pin 1 CAN-H, pin 2 CAN-L, pin 3 GND, no termination). `aux` is always listen-only, so a tapped bus is never driven. Only one CAN at a time. A reset goes back to `obd` |
 | `ble` | Show pairing status |
 | `ble pair` | Open the Bluetooth pairing window |
 | `ble forget` | Forget every paired phone |
