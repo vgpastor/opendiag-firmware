@@ -221,13 +221,13 @@ These are not implemented yet. A pull request for any of them is welcome.
 | --- | --- | --- |
 | ELM327 | Interrupting a request with any byte (`STOPPED`) | Works in `AT MA` only. Apps use it to cancel |
 | ELM327 | CAN requests longer than one frame | Needed for long `2E`/`31` over ELM327. Today it answers `?` |
-| ELM327 | `CSM0`, monitor on K-Line and J1850, `MR`/`MT` on 11-bit | `MA` is CAN only and always silent |
+| ELM327 | `CSM0`, monitor on J1850, `MR`/`MT` on 11-bit CAN | `MA` covers CAN and K-Line and is always silent |
 | ELM327 | Error replies `CAN ERROR`, `BUS ERROR`, `DATA ERROR`, `BUFFER FULL` | Most failures answer `?` or `NO DATA` |
 | ELM327 | `M1` and persistent settings (protocol, `PP`, `SD`) | Needs NVS. Everything is in RAM today |
 | ELM327 | `CV` voltage calibration, `@2`/`@3`, `RTR`, `C0`/`C1`, `CTM`/`JTM`, `IFR4–6`, `PP 00–2B` | Smaller items |
 | ELM327 | Protocol A (SAE J1939) | Trucks |
 | ELM327 | STN/OBDLink extensions (`STI`, `STFAP`, `STCSEGT`…) | Check the STN reference manual for exact syntax |
-| Firmware | The second CAN transceiver | |
+| Firmware | Two CAN buses at once | One TWAI controller; the second transceiver serves AUX or pins 3/11 in turn |
 | Firmware | The debug shell over WiFi | Only the data link is on TCP 35000 |
 | Firmware | Joining an existing WiFi network (station mode) | Only the adapter's own access point today |
 | Firmware | A persistent per-link default mode | A bench unit needs `mode usb slcan` after each power cycle |
