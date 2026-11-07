@@ -1033,6 +1033,19 @@ int vif_bus_reset_stats(vif_bus_t bus) {
     return 0;
 }
 
+esp_err_t vif_can_port_set(can_port_t port) {
+    esp_err_t err;
+
+    LOCK();
+    /* The other way round from vif_pin_set(): not onto pin 11 while it is
+     * energised. */
+    err = (port == CAN_PORT_MS && g.hs_pin == HS_OBD_PIN_11)
+              ? ESP_ERR_INVALID_STATE
+              : can_bus_set_port(port);
+    UNLOCK();
+    return err;
+}
+
 esp_err_t vif_pin_set(vif_owner_t owner, int obd_pin, vif_pin_mode_t m,
                       uint32_t mv) {
     bool high_side = (obd_pin == HS_OBD_PIN_6 || obd_pin == HS_OBD_PIN_9 ||
@@ -1072,6 +1085,12 @@ esp_err_t vif_pin_set(vif_owner_t owner, int obd_pin, vif_pin_mode_t m,
         break;
 
     case VIF_PIN_VOLTAGE:
+        /* With the MS port fitted, pin 11 is CAN-L: never put voltage on a
+         * bus line. */
+        if (obd_pin == HS_OBD_PIN_11 && can_bus_port() == CAN_PORT_MS) {
+            UNLOCK();
+            return ESP_ERR_INVALID_STATE;
+        }
         if (g.ls_pin == obd_pin) {
             UNLOCK();
             return ESP_ERR_INVALID_STATE; /* already pulled to ground */
