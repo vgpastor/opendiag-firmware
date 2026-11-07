@@ -358,6 +358,52 @@ static void elm327_kline_apply_wakeup(elm327_ctx_t *e);
 
 /* Defined further down, beside the CAN transfer path they belong to. */
 static bool elm327_at_extra_command(elm327_ctx_t *e, const char *cmd);
+
+/*
+ * What a request came to, beyond the reply lines already printed. The
+ * protocol xfer functions return these; elm327_parse_command() turns them into
+ * the ELM327's own words, which apps parse to decide whether to retry, reset
+ * or give up.
+ */
+enum {
+    ELM327_XFER_NO_DATA = -1,    /* "NO DATA" */
+    ELM327_XFER_BAD = -2,        /* "?": the request itself is wrong */
+    ELM327_XFER_REPORTED = -3,   /* already reported in full */
+    ELM327_XFER_CAN_ERROR = -4,  /* "CAN ERROR": could not open or send */
+    ELM327_XFER_BUS_ERROR = -5,  /* "BUS ERROR": the byte bus failed us */
+    ELM327_XFER_BUS_BUSY = -6,   /* "BUS BUSY": never went idle to send */
+    ELM327_XFER_DATA_ERROR = -7, /* "DATA ERROR": a reply, but corrupt */
+};
+
+static const char *elm327_xfer_error(int rc) {
+    switch (rc) {
+    case ELM327_XFER_NO_DATA:
+        return "NO DATA\r";
+    case ELM327_XFER_CAN_ERROR:
+        return "CAN ERROR\r";
+    case ELM327_XFER_BUS_ERROR:
+        return "BUS ERROR\r";
+    case ELM327_XFER_BUS_BUSY:
+        return "BUS BUSY\r";
+    case ELM327_XFER_DATA_ERROR:
+        return "DATA ERROR\r";
+    default:
+        return "?\r";
+    }
+}
+
+/** A byte bus send failure, in the ELM327's words. */
+static int elm327_bus_send_error(int ret) {
+    switch (ret) {
+    case BUS_ERR_TOO_LONG:
+    case BUS_ERR_BAD_ARG:
+        return ELM327_XFER_BAD;
+    case BUS_ERR_BUS_BUSY:
+        return ELM327_XFER_BUS_BUSY;
+    default:
+        return ELM327_XFER_BUS_ERROR;
+    }
+}
 static bool elm327_can_formatted(const elm327_ctx_t *e);
 static unsigned elm327_can_addr_len(const elm327_ctx_t *e);
 
@@ -1984,7 +2030,7 @@ static int elm327_can_ensure_open(elm327_ctx_t *e) {
     /* Same guard as AT SP: never transmit into a bus at another rate. */
     cfg.listen_first = can_guard;
     if (vif_bus_open(VIF_OWNER_LINK, VIF_BUS_CAN, &cfg) != ESP_OK)
-        return -2;
+        return ELM327_XFER_CAN_ERROR;
     elm327_apply_bus_policy(e, VIF_BUS_CAN, e->settings.current_protocol);
     return 0;
 }
@@ -2009,9 +2055,10 @@ static int elm327_can_protocol_xfer(elm327_ctx_t *e, const uint8_t *frame,
     const bool formatted = elm327_can_formatted(e);
     const bool var_dlc =
         e->settings.var_dlc || (elm327_can_opts(e) & ELM327_OPT_VAR_DLC);
+    int fail_rc = ELM327_XFER_BAD;
 
     if (elm327_can_ensure_open(e))
-        return -2;
+        return ELM327_XFER_CAN_ERROR;
 
     tx_frame.id = elm327_can_request_id(e);
 
@@ -2067,6 +2114,7 @@ static int elm327_can_protocol_xfer(elm327_ctx_t *e, const uint8_t *frame,
     ret = can_frame_send(&tx_frame);
     if (ret != 0) {
         ESP_LOGE(TAG, "Fail to send CAN frame ret=%d\n", ret);
+        fail_rc = ELM327_XFER_CAN_ERROR;
         goto fail;
     }
 
@@ -2166,8 +2214,12 @@ static int elm327_can_protocol_xfer(elm327_ctx_t *e, const uint8_t *frame,
         }
         isotp_segment_t segment;
         ret = isotp_rx_feed(stream, &rx, now, &segment);
-        if (ret < 0)
+        if (ret < 0) {
+            /* Out of sequence or past its own length: a reply arrived, but
+             * not one that can be put back together. */
+            fail_rc = ELM327_XFER_DATA_ERROR;
             goto fail;
+        }
         if (ret == ISOTP_IGNORED)
             continue;
         if (segment.replaced)
@@ -2185,8 +2237,10 @@ static int elm327_can_protocol_xfer(elm327_ctx_t *e, const uint8_t *frame,
             } else {
                 int sent = can_frame_send_confirmed(&fc);
                 now = (uint32_t)Timer_elapsed_ms(&since_request) * 1000u;
-                if (isotp_rx_confirm(stream, sent == 0, now) < 0)
+                if (isotp_rx_confirm(stream, sent == 0, now) < 0) {
+                    fail_rc = ELM327_XFER_CAN_ERROR;
                     goto fail;
+                }
             }
         }
         uint8_t display_dlc = rx.dlc;
@@ -2216,7 +2270,7 @@ static int elm327_can_protocol_xfer(elm327_ctx_t *e, const uint8_t *frame,
     return frame_counter ? 0 : -1;
 
 fail:
-    return -2;
+    return fail_rc;
 }
 
 /**
@@ -2487,10 +2541,11 @@ static void elm327_observe_late_replies(elm327_ctx_t *e) {
 }
 
 static void elm327_print_j1850_kline_frame(elm327_ctx_t *e, const uint8_t *data,
-                                           size_t len) {
+                                           size_t len, uint16_t status) {
     /* Three characters per byte with spacing on, for a frame as long as
-     * KLINE_FRAME_CAP, plus the carriage return and the terminator. */
-    char outstr[KLINE_FRAME_CAP * 3 + 2] = {0};
+     * KLINE_FRAME_CAP, the error marker, the carriage return and the
+     * terminator. */
+    char outstr[KLINE_FRAME_CAP * 3 + sizeof("<DATA ERROR") + 2] = {0};
     char *p = &outstr[0];
     size_t hdr = elm327_header_len(e, data, len);
 
@@ -2511,9 +2566,15 @@ static void elm327_print_j1850_kline_frame(elm327_ctx_t *e, const uint8_t *data,
             p += 2;
         }
     }
+    /* The ELM327 marks a line whose checksum failed, rather than drop it:
+     * the data may still be what the client wanted. */
+    if (status & BUS_RX_BAD_CHECKSUM)
+        p += sprintf(p, "<DATA ERROR");
     *p++ = '\r';
     *p++ = '\0';
 
+    if (status & BUS_RX_BUFFER_OVERFLOW)
+        elm327_send_string(e, "BUFFER FULL\r");
     elm327_send_string(e, outstr);
 }
 
@@ -2899,7 +2960,7 @@ static int elm327_bus_xfer(elm327_ctx_t *e, const uint8_t *frame, size_t len,
     ret = vif_bus_send(VIF_OWNER_LINK, elm327_bus(e), &tx_msg, tx_flags);
     if (ret != 0) {
         ESP_LOGE(TAG, "Fail to send frame ret=%d", ret);
-        return -2;
+        return elm327_bus_send_error(ret);
     }
 
     elm327_timing_begin(e, frame, len, num_frame);
@@ -2948,7 +3009,7 @@ static int elm327_bus_xfer(elm327_ctx_t *e, const uint8_t *frame, size_t len,
             continue;
         }
 
-        elm327_print_j1850_kline_frame(e, rx_frame, ret);
+        elm327_print_j1850_kline_frame(e, rx_frame, ret, rx.status);
         frame_counter++;
         uint32_t latency_ms = (uint32_t)Timer_elapsed_ms(&since_request);
         elm327_timing_reply(e, latency_ms, false);
@@ -3164,7 +3225,7 @@ static int elm327_search_protocol_xfer(elm327_ctx_t *e, const uint8_t *frame,
 
     vif_bus_release_all(VIF_OWNER_LINK);
     e->settings.auto_search = false;
-    return ret;
+    return ret <= ELM327_XFER_CAN_ERROR ? ELM327_XFER_BAD : ret;
 
 done:
     e->in_search = false;
@@ -3623,13 +3684,11 @@ static void elm327_parse_command(elm327_ctx_t *e, const char *cmd) {
                 e->timing.watch.active = false;
             }
 
-            if (rc == -1) {
-                elm327_send_string(e, "NO DATA\r");
-            } else if (rc == -3) {
+            if (rc == ELM327_XFER_REPORTED) {
                 /* Already reported in full - a second line here would have
                  * the client seeing "BUS INIT: ...ERROR" followed by "?". */
             } else if (rc < 0) {
-                elm327_send_string(e, "?\r");
+                elm327_send_string(e, elm327_xfer_error(rc));
             }
         }
     }
