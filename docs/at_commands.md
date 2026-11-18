@@ -126,9 +126,9 @@ Bluetooth.
 | :--- | :--- | :--- |
 | `C0, C1` | send Confirmation off, or on | |
 | `CAF0, CAF1` | Automatic Formatting off, or on |  ✅ |
-| `CEA` | CAN Extended Addressing off | |
-| `CEA hh` | use CAN Extended Address hh | |
-| `CER hh` | set CAN Extended Rx address to hh | |
+| `CEA` | CAN Extended Addressing off | ✅ |
+| `CEA hh` | use CAN Extended Address hh | ✅ |
+| `CER hh` | set CAN Extended Rx address to hh | ✅ |
 | `CF hhh` | set the ID Filter to hhh | ✅ |
 | `CF hhhhhhhh` | set the ID Filter to hhhhhhhh | ✅ |
 | `CFC0, CFC1` | Flow Controls off, or on | ✅ |
@@ -180,3 +180,5 @@ Bluetooth.
 `AT CRA`, `CF` and `CM` replace the default OBD reply ranges with a CAN identifier and mask. For physical requests with a filter, flow control uses the request identifier.
 
 `AT FC SH`, `FC SD` and `FC SM` configure flow control. FC SD accepts CTS (30, block size and valid STmin); `CFC0` disables outgoing flow control and displays the first frame.
+
+`AT CEA hh` adds an extended address to outgoing frames and hides it with transport headers in CAF1/H0. `AT CER hh` filters the reply address; `AT CEA` disables extended addressing.
