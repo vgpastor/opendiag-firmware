@@ -185,4 +185,7 @@ Bluetooth.
 
 Protocols B/C use configurable CAN options and a 500 kbit/s baud divisor (`PB`, `PP 2C–2F`, `PPS`). Unsupported J1939 formats are refused. PP settings survive AT Z, but not a power cycle.
 
+
+With an unformatted CAN protocol, replies with a client-managed extended address are displayed unchanged when no explicit `CEA` is configured. Explicit `CEA` keeps ISO-TP flow control, and B/C protocol format options remain authoritative under CAF1.
+
 The B/C divisor must select a rate the driver supports: 1000, 500, 250, 125 or 50 kbit/s on this branch. The independent expanded-rate change adds the remaining rates.
