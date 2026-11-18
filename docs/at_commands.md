@@ -35,12 +35,12 @@ Bluetooth.
 
 | CMD | Description | Supported |
 | :--- | :--- | :--- |
-| `PP xx OFF` | disable Prog Parameter xx | |
-| `PP FF OFF` | all Prog Parameters disabled | |
-| `PP xx ON` | enable Prog Parameter xx | |
-| `PP FF ON` | all Prog Parameters enabled | |
-| `PP xx SV yy` | for PP xx, Set the Value to yy | |
-| `PPS` | print a PP Summary | |
+| `PP xx OFF` | disable Prog Parameter xx | ✅ 2C-2F only |
+| `PP FF OFF` | all Prog Parameters disabled | ✅ 2C-2F only |
+| `PP xx ON` | enable Prog Parameter xx | ✅ 2C-2F only |
+| `PP FF ON` | all Prog Parameters enabled | ✅ 2C-2F only |
+| `PP xx SV yy` | for PP xx, Set the Value to yy | ✅ 2C-2F only |
+| `PPS` | print a PP Summary | ✅ 2C-2F only |
 
 ### Voltage Reading Commands
 
@@ -147,7 +147,7 @@ Bluetooth.
 | `FC SH hhh` | FC, Set the Header to hhh | ✅ |
 | `FC SH hhhhhhhh` | Set the Header to hhhhhhhh | ✅ |
 | `FC SD [1 - 5 bytes]` | FC, Set Data to [...] | ✅ CTS only, see below |
-| `PB xx yy` | Protocol B options and baud rate | |
+| `PB xx yy` | Protocol B options and baud rate | ✅ no J1939 format |
 | `RTR` | send an RTR message | |
 | `V0, V1` | use of Variable DLC off, or on | |
 
@@ -182,3 +182,7 @@ Bluetooth.
 `AT FC SH`, `FC SD` and `FC SM` configure flow control. FC SD accepts CTS (30, block size and valid STmin); `CFC0` disables outgoing flow control and displays the first frame.
 
 `AT CEA hh` adds an extended address to outgoing frames and hides it with transport headers in CAF1/H0. `AT CER hh` filters the reply address; `AT CEA` disables extended addressing.
+
+Protocols B/C use configurable CAN options and a 500 kbit/s baud divisor (`PB`, `PP 2C–2F`, `PPS`). Unsupported J1939 formats are refused. PP settings survive AT Z, but not a power cycle.
+
+The B/C divisor must select a rate the driver supports: 1000, 500, 250, 125 or 50 kbit/s on this branch. The independent expanded-rate change adds the remaining rates.
