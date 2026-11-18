@@ -131,7 +131,7 @@ Bluetooth.
 | `CER hh` | set CAN Extended Rx address to hh | |
 | `CF hhh` | set the ID Filter to hhh | ✅ |
 | `CF hhhhhhhh` | set the ID Filter to hhhhhhhh | ✅ |
-| `CFC0, CFC1` | Flow Controls off, or on | |
+| `CFC0, CFC1` | Flow Controls off, or on | ✅ |
 | `CM hhh` | set the ID Mask to hhh | ✅ |
 | `CM hhhhhhhh` | set the ID Mask to hhhhhhhh | ✅ |
 | `CP hh` | set CAN Priority to hh (29 bit) | |
@@ -143,10 +143,10 @@ Bluetooth.
 | `CTM1` | set Timer Multiplier to 1 | |
 | `CTM5` | set Timer Multiplier to 5 | |
 | `D0, D1` | display of the DLC off, or on | ✅ |
-| `FC SM h` | Flow Control, Set the Mode to h | |
-| `FC SH hhh` | FC, Set the Header to hhh | |
-| `FC SH hhhhhhhh` | Set the Header to hhhhhhhh | |
-| `FC SD [1 - 5 bytes]` | FC, Set Data to [...] | |
+| `FC SM h` | Flow Control, Set the Mode to h | ✅ |
+| `FC SH hhh` | FC, Set the Header to hhh | ✅ |
+| `FC SH hhhhhhhh` | Set the Header to hhhhhhhh | ✅ |
+| `FC SD [1 - 5 bytes]` | FC, Set Data to [...] | ✅ CTS only, see below |
 | `PB xx yy` | Protocol B options and baud rate | |
 | `RTR` | send an RTR message | |
 | `V0, V1` | use of Variable DLC off, or on | |
@@ -178,3 +178,5 @@ Bluetooth.
 ### Additional implemented commands
 
 `AT CRA`, `CF` and `CM` replace the default OBD reply ranges with a CAN identifier and mask. For physical requests with a filter, flow control uses the request identifier.
+
+`AT FC SH`, `FC SD` and `FC SM` configure flow control. FC SD accepts CTS (30, block size and valid STmin); `CFC0` disables outgoing flow control and displays the first frame.
