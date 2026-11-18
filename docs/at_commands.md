@@ -73,9 +73,9 @@ Bluetooth.
 | `FT hh` | Filter for Transmitter = hh | ✅ |
 | `H0, H1` | Headers off, or on | ✅ |
 | `IA` | Is the protocol Active? | ✅ |
-| `MA` | Monitor All | ✅ CAN only |
-| `MR hh` | Monitor for Receiver = hh | ✅ CAN 29 bit only |
-| `MT hh` | Monitor for Transmitter = hh | ✅ CAN 29 bit only |
+| `MA` | Monitor All | ✅ CAN and K-Line |
+| `MR hh` | Monitor for Receiver = hh | ✅ CAN and K-Line |
+| `MT hh` | Monitor for Transmitter = hh | ✅ CAN and K-Line |
 | `NL` | Normal Length messages | ✅ |
 | `PC` | Protocol Close | ✅ |
 | `R0, R1` | Responses off, or on | ✅ |
@@ -186,5 +186,10 @@ Bluetooth.
 Protocols B/C use configurable CAN options and a 500 kbit/s baud divisor (`PB`, `PP 2C–2F`, `PPS`). Unsupported J1939 formats are refused. PP settings survive AT Z, but not a power cycle.
 
 `AT MA`, `MR hh` and `MT hh` monitor CAN listen-only until any client byte arrives. MR/MT require 29-bit identifiers. The bounded queue can lose frames on a busy bus; use SLCAN for full captures.
+
+
+### K-Line monitoring
+
+`AT MA`, `MR hh` and `MT hh` also monitor K-Line on protocols 3–5, without initialisation or transmission. Messages are framed by the discovery gap; MR/MT filter target/source header bytes. Any client byte stops monitoring and releases the bus.
 
 The B/C divisor must select a rate the driver supports: 1000, 500, 250, 125 or 50 kbit/s on this branch. The independent expanded-rate change adds the remaining rates.
